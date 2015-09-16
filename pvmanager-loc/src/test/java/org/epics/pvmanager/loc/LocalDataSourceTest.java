@@ -4,39 +4,31 @@
  */
 package org.epics.pvmanager.loc;
 
+import static org.epics.pvmanager.ExpressionLanguage.channels;
+import static org.epics.pvmanager.ExpressionLanguage.latestValueOf;
+import static org.epics.pvmanager.ExpressionLanguage.mapOf;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.nullValue;
+import static org.junit.Assert.assertThat;
+
 import java.util.Arrays;
-import org.epics.pvmanager.CompositeDataSource;
+
 import org.epics.pvmanager.ConnectionCollector;
-import org.epics.pvmanager.ReadRecipe;
-import org.epics.pvmanager.ExceptionHandler;
-import org.epics.pvmanager.PVReader;
-import org.epics.pvmanager.PVManager;
-import org.epics.pvmanager.PVWriterListener;
-import org.epics.pvmanager.PVWriter;
-import org.epics.pvmanager.ValueCache;
-import org.epics.pvmanager.WriteRecipe;
-import org.epics.pvmanager.WriteCache;
-import org.epics.vtype.VDouble;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import static org.junit.Assert.*;
-import static org.hamcrest.Matchers.*;
-import static org.mockito.Mockito.*;
-import static org.epics.pvmanager.ExpressionLanguage.*;
 import org.epics.pvmanager.QueueCollector;
 import org.epics.pvmanager.ReadExpressionTester;
+import org.epics.pvmanager.ReadRecipe;
 import org.epics.pvmanager.ReadRecipeBuilder;
+import org.epics.pvmanager.ValueCache;
 import org.epics.pvmanager.ValueCacheImpl;
-import org.epics.vtype.VDoubleArray;
-import org.epics.vtype.VString;
-import org.epics.vtype.VStringArray;
-import org.epics.pvmanager.expression.Queue;
-import org.epics.pvmanager.loc.LocalDataSource;
-import org.epics.pvmanager.loc.LocalDataSource;
 import org.epics.util.array.ArrayDouble;
 import org.epics.util.array.ListNumber;
+import org.epics.vtype.VDouble;
+import org.epics.vtype.VDoubleArray;
+import org.epics.vtype.VEnum;
+import org.epics.vtype.VString;
+import org.epics.vtype.VStringArray;
+import org.junit.Test;
 
 /**
  *
@@ -139,5 +131,35 @@ public class LocalDataSourceTest {
         VStringArray vStrings = (VStringArray) value;
         assertThat(vStrings.getData(), equalTo(Arrays.asList("A", "B", "C")));
     }
-    
+
+    @Test
+    public void venum1() throws Exception {
+        LocalDataSource dataSource1 = new LocalDataSource();
+        ReadRecipeBuilder builder = new ReadRecipeBuilder();
+        ValueCache<Object> valueCache = new ValueCacheImpl<>(Object.class);
+        builder.addChannel("venum<VEnum>(1, \"A\",\"B\",\"C\")", valueCache);
+        ReadRecipe recipe = builder.build(new QueueCollector<Exception>(10), new ConnectionCollector());
+
+        dataSource1.connectRead(recipe);
+        Thread.sleep(100);
+        Object value = valueCache.readValue();
+        dataSource1.disconnectRead(recipe);
+        assertThat(value, instanceOf(VEnum.class));
+        VEnum val = (VEnum) value;
+        assertThat(val.getLabels(), equalTo(Arrays.asList("A", "B", "C")));
+        assertThat(val.getIndex(), equalTo(1));
+    }
+
+    @Test(expected=RuntimeException.class)
+    public void invalidVEnum() throws Exception {
+        LocalDataSource dataSource1 = new LocalDataSource();
+        ReadRecipeBuilder builder = new ReadRecipeBuilder();
+        ValueCache<Object> valueCache = new ValueCacheImpl<>(Object.class);
+        builder.addChannel("venum<VEnum>(1, 1.0, 2.0)", valueCache);
+        ReadRecipe recipe = builder.build(new QueueCollector<Exception>(10), new ConnectionCollector());
+        builder.addChannel("venum", valueCache);
+        // Throws RuntimeException
+        dataSource1.connectRead(recipe);
+    }
+
 }
